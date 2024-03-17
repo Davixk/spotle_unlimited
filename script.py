@@ -21,6 +21,7 @@ OUTPUT_FOLDER = 'output'
 DEFAULT_LINK = 'https://spotle.io'
 DEFAULT_MESSAGE = "Created by Dave's script with <3"
 DEFAULT_SAMPLE_SIZE = 250
+DEBUG = True
 
 
 # GET RANDOM SPOTIFY ARTIST FROM TOP 1000 ARTISTS
@@ -137,11 +138,13 @@ def create_new_game(
 
     try:
         message_text = "Artist not in Spotify's Top 1000"
-        error_message = WebDriverWait(driver, 1).until(
+        error_message = WebDriverWait(driver, 2).until(
             EC.visibility_of_element_located((By.CLASS_NAME, 'info-prompt'))
         )
         if error_message and error_message.text == message_text:
             raise ValueError(f"Invalid artist name: {artist_name}. Please retry")
+    except ValueError as e:
+        raise e
     except:
         challenge_form_class = "challenge-form"
         condition = EC.visibility_of_element_located((By.CLASS_NAME, challenge_form_class))
@@ -200,7 +203,10 @@ def open_game_link(game_link):
 
 def main():
     top_2500_artists = get_top_2500_artists()
-    difficulty = input("Choose your difficulty : \n1. Super Easy (50)\n2. Easy (100)\n3. Medium (250)\n4. Hard (500)\n5. Super Hard (1000)\n")
+    if DEBUG:
+        difficulty = '5'
+    else:
+        difficulty = input("Choose your difficulty : \n1. Super Easy (50)\n2. Easy (100)\n3. Medium (250)\n4. Hard (500)\n5. Super Hard (1000)\n")
     if difficulty == '1':
         sample_size = 50
     elif difficulty == '2':
