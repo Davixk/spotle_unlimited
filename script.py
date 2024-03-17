@@ -14,7 +14,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 client_id = '7039fa9e3ff9490fae786fd557679ad5'
 client_secret = '60c22025159943a3818f404fdce76da4'
@@ -92,6 +91,8 @@ def get_chrome_driver(options=None):
     if not options:
         options = Options()
         options.headless = True
+        options.add_argument("--headless=new")
+        options.add_argument("--disable-gpu")
         options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
 
     driver = webdriver.Chrome(options=options)
@@ -142,6 +143,12 @@ def create_new_game(
         if error_message and error_message.text == message_text:
             raise ValueError(f"Invalid artist name: {artist_name}. Please retry")
     except:
+        challenge_form_class = "challenge-form"
+        condition = EC.visibility_of_element_located((By.CLASS_NAME, challenge_form_class))
+        WebDriverWait(driver, 10).until(condition)
+        input_field = driver.find_element(By.CLASS_NAME, challenge_form_class)
+        input_field.send_keys(message)
+
         share_button_class = "challenge-share-btn"
         condition = EC.element_to_be_clickable((By.CLASS_NAME, share_button_class))
         WebDriverWait(driver, 10).until(condition).click()
@@ -152,7 +159,7 @@ def create_new_game(
         source_file = "app.js"
         string = f'{link}/{source_file}'
         artist_source_line = " 1262:10"
-        message_source_line = " 1264"
+        message_source_line = " 1263:10"
         spotle_logs = []
         artist_code = None
         message_code = None
@@ -167,7 +174,7 @@ def create_new_game(
         if artist_code and message_code:
             return artist_code, message_code
         else:
-            logging.error('Artist or message code not found. Please retry')
+            raise Exception('Artist or message code not found. Please retry')
     finally:
         driver.quit()
 
@@ -206,22 +213,30 @@ def main():
         sample_size = 1000
     else:
         sample_size = DEFAULT_SAMPLE_SIZE
-    top_1000_artists = top_2500_artists[:sample_size]
-    random_artist = random.choice(top_1000_artists)
-    position = top_1000_artists.index(random_artist)
-    logging.info(f'Random artist: {random_artist} - Position: {position}')
-
-    # NOW WE PLAY SPOTLE.IO
+    logging.debug(f'Sample size: {sample_size}')
+    top_artists = top_2500_artists[:sample_size]
+    
+    success = False
     driver = get_chrome_driver()
-    artist_code = create_new_game(
-        driver=driver,
-        artist_name=random_artist,
-    )
-    game_link = get_game_link(
-        artist_code=encoded_artist,
-        message_code=encoded_message
-    )
-    open_game_link(game_link)
+    while not success:
+        try:
+            random_artist = random.choice(top_artists)
+            position = top_2500_artists.index(random_artist) + 1
+            logging.info(f'Random artist: {random_artist} - Position: {position}')
+            
+            # NOW WE PLAY SPOTLE.IO
+            artist_code, message_code = create_new_game(
+                driver=driver,
+                artist_name=random_artist,
+            )
+            game_link = get_game_link(
+                artist_code=artist_code,
+                message_code=message_code
+            )
+            open_game_link(game_link)
+            success = True
+        except ValueError as e:
+            logging.warning(f"{e}. Rerolling...")
 
 
 if __name__ == '__main__':
