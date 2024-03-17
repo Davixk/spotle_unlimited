@@ -88,7 +88,7 @@ def get_chrome_driver(options=None):
 
 def setup_logging():
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    if DEBUG_IS_COMPILED is True:
+    if DEBUG_IS_COMPILED is False:
         logging.basicConfig(filename='script.log',
                             level=logging.DEBUG,
                             format=log_format)
