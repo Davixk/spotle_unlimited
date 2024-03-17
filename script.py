@@ -14,6 +14,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
+from selenium.common.exceptions import TimeoutException
 
 client_id = '7039fa9e3ff9490fae786fd557679ad5'
 client_secret = '60c22025159943a3818f404fdce76da4'
@@ -21,7 +22,9 @@ OUTPUT_FOLDER = 'output'
 DEFAULT_LINK = 'https://spotle.io'
 DEFAULT_MESSAGE = "Created by Dave's script with <3"
 DEFAULT_SAMPLE_SIZE = 250
-DEBUG = True
+DEBUG_DIFFICULTY = True
+DEBUG_ARTIST_NAME = False
+DEBUG_BROWSER = False
 
 
 # GET RANDOM SPOTIFY ARTIST FROM TOP 1000 ARTISTS
@@ -92,8 +95,9 @@ def get_chrome_driver(options=None):
     if not options:
         options = Options()
         options.headless = True
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
+        if not DEBUG_BROWSER:
+            options.add_argument("--headless=new")
+            options.add_argument("--disable-gpu")
         options.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
 
     driver = webdriver.Chrome(options=options)
@@ -112,6 +116,17 @@ def setup_logging():
     selenium_logger.setLevel(logging.INFO)
     urllib3_logger = logging.getLogger('urllib3')
     urllib3_logger.setLevel(logging.INFO)
+
+def initialize_game(driver=None, link=DEFAULT_LINK) -> webdriver.Chrome:
+    if not driver:
+        driver = get_chrome_driver()
+    driver.get(link)
+    
+    button_class = "challenge-btn"
+    condition = EC.element_to_be_clickable((By.CLASS_NAME, button_class))
+    WebDriverWait(driver, 10).until(condition).click()
+    
+    return driver
 
 def create_new_game(
     driver = None,
@@ -181,6 +196,52 @@ def create_new_game(
     finally:
         driver.quit()
 
+def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) -> tuple:
+    # Ensure the search input is visible and clear any existing text
+    input_name = "search"
+    condition = EC.visibility_of_element_located((By.NAME, input_name))
+    WebDriverWait(driver, 10).until(condition)
+    input_field = driver.find_element(By.NAME, input_name)
+    input_field.clear()
+    input_field.send_keys(artist_name + Keys.ENTER)
+
+    # Wait briefly for the share button to become clickable, indicating successful artist input
+    share_button_class = "challenge-share-btn"
+    try:
+        WebDriverWait(driver, 1).until(EC.element_to_be_clickable((By.CLASS_NAME, share_button_class)))
+        challenge_form_class = "challenge-form"
+        condition = EC.visibility_of_element_located((By.CLASS_NAME, challenge_form_class))
+        WebDriverWait(driver, 10).until(condition)
+        input_field = driver.find_element(By.CLASS_NAME, challenge_form_class)
+        input_field.send_keys(message + Keys.ENTER)
+        share_button = driver.find_element(By.CLASS_NAME, share_button_class)
+        share_button.click()
+        
+        logs = driver.get_log('browser')
+        artist_code, message_code = extract_codes_from_logs(logs)
+        return artist_code, message_code
+    except TimeoutException:
+        # Share button didn't become visible within the expected timeframe
+        raise ValueError(f"Share button not found for artist {artist_name}. Possible issue with artist eligibility or page loading.")
+
+def extract_codes_from_logs(
+    logs: list,
+    source_file: str = "app.js",
+    ) -> tuple:
+    string = f'{DEFAULT_LINK}/{source_file}'
+    artist_source_line = " 1262:10"
+    message_source_line = " 1263:10"
+    artist_code = None
+    message_code = None
+    for log in logs:
+        if log['message'].startswith(string):
+            restof_log = log['message'][len(string):]
+            if restof_log.startswith(artist_source_line):
+                artist_code = restof_log[len(artist_source_line):].strip().strip('"')
+            elif restof_log.startswith(message_source_line):
+                message_code = restof_log[len(message_source_line):].strip().strip('"')
+    return artist_code, message_code
+
 def get_game_link(artist_code, message_code=None, link=DEFAULT_LINK):
     if not message_code:
         message_code = encode(DEFAULT_MESSAGE)
@@ -203,7 +264,7 @@ def open_game_link(game_link):
 
 def main():
     top_2500_artists = get_top_2500_artists()
-    if DEBUG:
+    if DEBUG_DIFFICULTY:
         difficulty = '5'
     else:
         difficulty = input("Choose your difficulty : \n1. Super Easy (50)\n2. Easy (100)\n3. Medium (250)\n4. Hard (500)\n5. Super Hard (1000)\n")
@@ -224,15 +285,18 @@ def main():
     
     success = False
     driver = get_chrome_driver()
+    initialized_driver = initialize_game(driver)
     while not success:
         try:
             random_artist = random.choice(top_artists)
             position = top_2500_artists.index(random_artist) + 1
             logging.info(f'Random artist: {random_artist} - Position: {position}')
+            if DEBUG_ARTIST_NAME:
+                random_artist = "TESTING ARTIST NAME"
             
             # NOW WE PLAY SPOTLE.IO
-            artist_code, message_code = create_new_game(
-                driver=driver,
+            artist_code, message_code = attempt_create_game(
+                driver=initialized_driver,
                 artist_name=random_artist,
             )
             game_link = get_game_link(
@@ -241,6 +305,7 @@ def main():
             )
             open_game_link(game_link)
             success = True
+            initialized_driver.quit()
         except ValueError as e:
             logging.warning(f"{e}. Rerolling...")
 
