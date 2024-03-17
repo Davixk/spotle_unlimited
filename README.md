@@ -10,7 +10,7 @@ Ever wanted to jump straight into a game on Spotle.io with a twist? Look no furt
 
 ## How to Use
 
-1. Download the `.exe` file from the latest release.
+1. Download the \`.exe\` file from the [latest release](https://github.com/Davixk/spotle_unlimited/releases/latest).
 2. Double click to run it. A console window will pop up.
 3. Follow the on-screen instructions to choose your difficulty level.
 4. The script will then automatically open a new tab in your default browser with your game ready to play.
