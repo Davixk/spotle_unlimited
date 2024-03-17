@@ -20,9 +20,10 @@ def is_compiled():
     # check if running in compiled mode (pyinstaller)
     is_compiled = getattr(sys, 'frozen', False)
     if not is_compiled:
-        logging.info('Running in development mode')
+        print('Running in development mode')
     else:
-        logging.info('Running in compiled mode')
+        print('Running in compiled mode')
+    return is_compiled
 
 client_id = '7039fa9e3ff9490fae786fd557679ad5'
 client_secret = '60c22025159943a3818f404fdce76da4'
