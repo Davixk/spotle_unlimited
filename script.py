@@ -22,26 +22,11 @@ OUTPUT_FOLDER = 'output'
 DEFAULT_LINK = 'https://spotle.io'
 DEFAULT_MESSAGE = "Created by Dave's script with <3"
 DEFAULT_SAMPLE_SIZE = 250
-DEBUG_DIFFICULTY = True
+DEBUG_DIFFICULTY = False
 DEBUG_ARTIST_NAME = False
 DEBUG_BROWSER = False
+DEBUG_SHOW_ARTISTS = False
 
-
-# GET RANDOM SPOTIFY ARTIST FROM TOP 1000 ARTISTS
-def get_random_artist(token):
-    import random
-    import requests
-    import json
-
-    # GET TOP 1000 ARTISTS
-    url = 'https://api.spotify.com/v1/playlists/37i9dQZEVXbMDoHDwVN2tF'
-    headers = {
-        'Authorization': 'Bearer ' + token
-    }
-    response = requests.get(url, headers=headers)
-    artists = response.json()['tracks']['items']
-    artist = random.choice(artists)['track']['artists'][0]['name']
-    return artist
 
 def save_to_json(data, filename):
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -77,19 +62,6 @@ def get_top_2500_artists():
         top_2500_artists.append(artist)
     save_to_json(top_2500_artists, 'top_2500_artists.json')
     return top_2500_artists_namesonly
-
-def get_token():
-    url = 'https://accounts.spotify.com/api/token'
-    client_creds = b64encode(f'{client_id}:{client_secret}'.encode()).decode()
-    headers = {
-        'Authorization': f'Basic {client_creds}',
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-    data = {
-        'grant_type': 'client_credentials'
-    }
-    response = requests.post(url, headers=headers, data=data)
-    return response.json()['access_token']
 
 def get_chrome_driver(options=None):
     if not options:
@@ -128,74 +100,6 @@ def initialize_game(driver=None, link=DEFAULT_LINK) -> webdriver.Chrome:
     
     return driver
 
-def create_new_game(
-    driver = None,
-    artist_name = None,
-    message = DEFAULT_MESSAGE,
-    link = DEFAULT_LINK,
-    ):
-    if not driver:
-        driver = get_chrome_driver()
-    if not artist_name:
-        artist = get_random_artist(get_token())
-        artist_name = artist['name']
-    driver.get(link)
-
-    button_class = "challenge-btn"
-    condition = EC.element_to_be_clickable((By.CLASS_NAME, button_class))
-    WebDriverWait(driver, 10).until(condition).click()
-
-    input_name = "search"
-    condition = EC.visibility_of_element_located((By.NAME, input_name))
-    WebDriverWait(driver, 10).until(condition)
-    input_field = driver.find_element(By.NAME, input_name)
-    input_field.send_keys(artist_name + Keys.ENTER)
-
-    try:
-        message_text = "Artist not in Spotify's Top 1000"
-        error_message = WebDriverWait(driver, 2).until(
-            EC.visibility_of_element_located((By.CLASS_NAME, 'info-prompt'))
-        )
-        if error_message and error_message.text == message_text:
-            raise ValueError(f"Invalid artist name: {artist_name}. Please retry")
-    except ValueError as e:
-        raise e
-    except:
-        challenge_form_class = "challenge-form"
-        condition = EC.visibility_of_element_located((By.CLASS_NAME, challenge_form_class))
-        WebDriverWait(driver, 10).until(condition)
-        input_field = driver.find_element(By.CLASS_NAME, challenge_form_class)
-        input_field.send_keys(message)
-
-        share_button_class = "challenge-share-btn"
-        condition = EC.element_to_be_clickable((By.CLASS_NAME, share_button_class))
-        WebDriverWait(driver, 10).until(condition).click()
-        # button uses Share feature from browser
-        # we need to wait for the share window to open
-
-        logs = driver.get_log('browser')
-        source_file = "app.js"
-        string = f'{link}/{source_file}'
-        artist_source_line = " 1262:10"
-        message_source_line = " 1263:10"
-        spotle_logs = []
-        artist_code = None
-        message_code = None
-        for log in logs:
-            if log['message'].startswith(string):
-                spotle_logs.append(log)
-                restof_log = log['message'][len(string):]
-                if restof_log.startswith(artist_source_line):
-                    artist_code = restof_log[len(artist_source_line):].strip().strip('"')
-                elif restof_log.startswith(message_source_line):
-                    message_code = restof_log[len(message_source_line):].strip().strip('"')
-        if artist_code and message_code:
-            return artist_code, message_code
-        else:
-            raise Exception('Artist or message code not found. Please retry')
-    finally:
-        driver.quit()
-
 def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) -> tuple:
     # Ensure the search input is visible and clear any existing text
     input_name = "search"
@@ -222,7 +126,10 @@ def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) 
         return artist_code, message_code
     except TimeoutException:
         # Share button didn't become visible within the expected timeframe
-        raise ValueError(f"Share button not found for artist {artist_name}. Possible issue with artist eligibility or page loading.")
+        if DEBUG_SHOW_ARTISTS:
+            raise ValueError(f"Share button not found for artist {artist_name}. Possible issue with artist eligibility or page loading.")
+        else:
+            raise ValueError(f"Share button not found. Possible issue with artist eligibility or page loading.")
 
 def extract_codes_from_logs(
     logs: list,
@@ -254,7 +161,7 @@ def get_game_link(artist_code, message_code=None, link=DEFAULT_LINK):
     logging.info(f'Game link: {game_link}')
     return game_link
 
-def encode(string):
+def encode(string): # Unused for now
     bytes_to_encode = string.encode('utf-8')
     encoded = b64encode(bytes_to_encode).decode('utf-8')
     return encoded
@@ -290,7 +197,10 @@ def main():
         try:
             random_artist = random.choice(top_artists)
             position = top_2500_artists.index(random_artist) + 1
-            logging.info(f'Random artist: {random_artist} - Position: {position}')
+            if DEBUG_SHOW_ARTISTS:
+                logging.info(f'Random artist: {random_artist} - Position: {position}')
+            else:
+                logging.info(f'Random artist chosen')
             if DEBUG_ARTIST_NAME:
                 random_artist = "TESTING ARTIST NAME"
             
