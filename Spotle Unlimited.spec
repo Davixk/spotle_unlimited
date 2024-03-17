@@ -21,7 +21,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='script',
+    name='Spotle Unlimited',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
