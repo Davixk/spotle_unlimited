@@ -1,6 +1,6 @@
 # CREATE RANDOM GAME @ SPOTLE.IO
 
-import random,requests,json,logging,os,urllib3,webbrowser
+import random,requests,json,logging,os,urllib3,webbrowser,sys
 from base64 import b64encode
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -16,6 +16,14 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
 from selenium.common.exceptions import TimeoutException
 
+def is_compiled():
+    # check if running in compiled mode (pyinstaller)
+    is_compiled = getattr(sys, 'frozen', False)
+    if not is_compiled:
+        logging.info('Running in development mode')
+    else:
+        logging.info('Running in compiled mode')
+
 client_id = '7039fa9e3ff9490fae786fd557679ad5'
 client_secret = '60c22025159943a3818f404fdce76da4'
 OUTPUT_FOLDER = 'output'
@@ -26,6 +34,7 @@ DEBUG_DIFFICULTY = False
 DEBUG_ARTIST_NAME = False
 DEBUG_BROWSER = False
 DEBUG_SHOW_ARTISTS = False
+DEBUG_IS_COMPILED = is_compiled()
 
 
 def save_to_json(data, filename):
@@ -60,7 +69,8 @@ def get_top_2500_artists():
         }
         top_2500_artists_namesonly.append(artist_name)
         top_2500_artists.append(artist)
-    save_to_json(top_2500_artists, 'top_2500_artists.json')
+    if DEBUG_IS_COMPILED is False:
+        save_to_json(top_2500_artists, 'top_2500_artists.json')
     return top_2500_artists_namesonly
 
 def get_chrome_driver(options=None):
@@ -77,9 +87,12 @@ def get_chrome_driver(options=None):
 
 def setup_logging():
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(filename='script.log',
-                        level=logging.DEBUG,
-                        format=log_format)
+    if DEBUG_IS_COMPILED is True:
+        logging.basicConfig(filename='script.log',
+                            level=logging.DEBUG,
+                            format=log_format)
+    else:
+        logging.basicConfig(level=logging.INFO, format=log_format)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(logging.Formatter(log_format))
@@ -209,11 +222,14 @@ def main():
                 driver=initialized_driver,
                 artist_name=random_artist,
             )
+            logging.info(f"Game successfully created. Creating game link...")
             game_link = get_game_link(
                 artist_code=artist_code,
                 message_code=message_code
             )
+            logging.info(f"Game link created. Opening game link in your browser...")
             open_game_link(game_link)
+            logging.info(f"Game link opened. Terminating...")
             success = True
             initialized_driver.quit()
         except ValueError as e:
