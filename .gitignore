@@ -1,2 +1,4 @@
 output/*
 script.log
+build
+dist
