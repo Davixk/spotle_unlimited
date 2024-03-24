@@ -135,9 +135,8 @@ def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) 
         share_button = driver.find_element(By.CLASS_NAME, share_button_class)
         share_button.click()
         
-        logs = driver.get_log('browser')
-        artist_code, message_code = extract_codes_from_logs(logs)
-        return artist_code, message_code
+        # Spotle.io changed how they pass the user the game link
+        return extract_url_from_clipboard()
     except TimeoutException:
         # Share button didn't become visible within the expected timeframe
         if DEBUG_SHOW_ARTISTS:
@@ -145,6 +144,7 @@ def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) 
         else:
             raise ValueError(f"Share button not found. Possible issue with artist eligibility or page loading.")
 
+# DEPRECATED
 def extract_codes_from_logs(
     logs: list,
     source_file: str = "app.js",
@@ -174,6 +174,16 @@ def get_game_link(artist_code, message_code=None, link=DEFAULT_LINK):
     game_link = f'{link}?{encoded_params}'
     logging.info(f'Game link: {game_link}')
     return game_link
+
+def extract_url_from_clipboard():
+    from pyperclip import paste
+    import re
+    text = paste()
+    # extract url from clipboard using regex
+    regex = r'(https?://\S+)'
+    match = re.search(regex, text)
+    if match:
+        return match.group(1)
 
 def encode(string): # Unused for now
     bytes_to_encode = string.encode('utf-8')
@@ -219,14 +229,9 @@ def main():
                 random_artist = "TESTING ARTIST NAME"
             
             # NOW WE PLAY SPOTLE.IO
-            artist_code, message_code = attempt_create_game(
+            game_link = attempt_create_game(
                 driver=initialized_driver,
                 artist_name=random_artist,
-            )
-            logging.info(f"Game successfully created. Creating game link...")
-            game_link = get_game_link(
-                artist_code=artist_code,
-                message_code=message_code
             )
             logging.info(f"Game link created. Opening game link in your browser...")
             open_game_link(game_link)
