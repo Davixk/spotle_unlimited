@@ -1,6 +1,6 @@
 # CREATE RANDOM GAME @ SPOTLE.IO
 
-import random,requests,json,logging,os,urllib3,webbrowser,sys
+import random,requests,json,logging,os,webbrowser,sys
 from base64 import b64encode
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -25,8 +25,6 @@ def is_compiled():
         print('Running in compiled mode')
     return is_compiled
 
-client_id = '7039fa9e3ff9490fae786fd557679ad5'
-client_secret = '60c22025159943a3818f404fdce76da4'
 OUTPUT_FOLDER = 'output'
 DEFAULT_LINK = 'https://spotle.io'
 DEFAULT_MESSAGE = "Created by Dave's script with <3"
@@ -36,6 +34,14 @@ DEBUG_ARTIST_NAME = False
 DEBUG_BROWSER = False
 DEBUG_SHOW_ARTISTS = False
 DEBUG_IS_COMPILED = is_compiled()
+DIFFICULTY_OPTIONS = {
+    # Difficulty: Sample size
+    '1': 50,
+    '2': 100,
+    '3': 250,
+    '4': 500,
+    '5': 1000
+}
 
 
 def save_to_json(data, filename):
@@ -51,11 +57,9 @@ def get_top_2500_artists():
     soup = BeautifulSoup(response.text)
     table_class = "addpos sortable"
     table = soup.find('table', {'class': table_class})
-    # get tbody
     tbody = table.find('tbody')
-    # get all rows
     rows = tbody.find_all('tr')
-    # artist name = second column - chart position = first column
+
     top_2500_artists_namesonly = []
     top_2500_artists = []
     for row in rows:
@@ -135,8 +139,8 @@ def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) 
         share_button = driver.find_element(By.CLASS_NAME, share_button_class)
         share_button.click()
         
-        # Spotle.io changed how they pass the user the game link
-        return extract_url_from_clipboard()
+        # Can only copy the link from the clipboard if driver isn't headless, so I'll build the link manually
+        return artist_name, message
     except TimeoutException:
         # Share button didn't become visible within the expected timeframe
         if DEBUG_SHOW_ARTISTS:
@@ -144,7 +148,7 @@ def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) 
         else:
             raise ValueError(f"Share button not found. Possible issue with artist eligibility or page loading.")
 
-# DEPRECATED
+# DEPRECATED - CODES AREN'T LOGGED TO CONSOLE BY SPOTLE.IO ANYMORE
 def extract_codes_from_logs(
     logs: list,
     source_file: str = "app.js",
@@ -175,11 +179,11 @@ def get_game_link(artist_code, message_code=None, link=DEFAULT_LINK):
     logging.info(f'Game link: {game_link}')
     return game_link
 
+# DEPRECATED - CAN'T USE CLIPBOARD IN HEADLESS MODE
 def extract_url_from_clipboard():
     from pyperclip import paste
     import re
     text = paste()
-    # extract url from clipboard using regex
     regex = r'(https?://\S+)'
     match = re.search(regex, text)
     if match:
@@ -196,21 +200,11 @@ def open_game_link(game_link):
 def main():
     top_2500_artists = get_top_2500_artists()
     if DEBUG_DIFFICULTY:
-        difficulty = '5'
+        sample_size = DIFFICULTY_OPTIONS.get("5", DEFAULT_SAMPLE_SIZE)
     else:
-        difficulty = input("Choose your difficulty : \n1. Super Easy (50)\n2. Easy (100)\n3. Medium (250)\n4. Hard (500)\n5. Super Hard (1000)\n")
-    if difficulty == '1':
-        sample_size = 50
-    elif difficulty == '2':
-        sample_size = 100
-    elif difficulty == '3':
-        sample_size = 250
-    elif difficulty == '4':
-        sample_size = 500
-    elif difficulty == '5':
-        sample_size = 1000
-    else:
-        sample_size = DEFAULT_SAMPLE_SIZE
+        difficulty = input("Choose your difficulty: \n1. Super Easy (50)\n2. Easy (100)\n3. Medium (250)\n4. Hard (500)\n5. Super Hard (1000)\n")
+        sample_size = DIFFICULTY_OPTIONS.get(difficulty, DEFAULT_SAMPLE_SIZE)
+
     logging.debug(f'Sample size: {sample_size}')
     top_artists = top_2500_artists[:sample_size]
     
@@ -229,10 +223,13 @@ def main():
                 random_artist = "TESTING ARTIST NAME"
             
             # NOW WE PLAY SPOTLE.IO
-            game_link = attempt_create_game(
+            artist_name, message = attempt_create_game(
                 driver=initialized_driver,
                 artist_name=random_artist,
             )
+            encoded_artist = encode(artist_name)
+            encoded_message = encode(message)
+            game_link = get_game_link(encoded_artist, encoded_message)
             logging.info(f"Game link created. Opening game link in your browser...")
             open_game_link(game_link)
             logging.info(f"Game link opened. Terminating...")
