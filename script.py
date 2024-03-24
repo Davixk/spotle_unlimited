@@ -139,7 +139,7 @@ def attempt_create_game(driver=None, artist_name=None, message=DEFAULT_MESSAGE) 
         share_button = driver.find_element(By.CLASS_NAME, share_button_class)
         share_button.click()
         
-        # Can only copy the link from the clipboard if driver isn't headless, so I'll build the link manually
+        # Can only copy the link from the clipboard if driver isn't headless and Spotle.io doesn't serve the link any other way. Fine, I'll create it myself.
         return artist_name, message
     except TimeoutException:
         # Share button didn't become visible within the expected timeframe
@@ -189,7 +189,7 @@ def extract_url_from_clipboard():
     if match:
         return match.group(1)
 
-def encode(string): # Unused for now
+def encode(string):
     bytes_to_encode = string.encode('utf-8')
     encoded = b64encode(bytes_to_encode).decode('utf-8')
     return encoded
